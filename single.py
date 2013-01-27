@@ -13,15 +13,15 @@ Options:
   -s, --status          Check to see if the file is locked, and if so, by which process. Exit status is 0
                         if unlocked, 1 if locked.
 
-flock(2)'ed file is used to provide locking. This will not leave stale lock files around. 
-Note that the existance of lock file does not mean that there is an outstanding lock; 
-exclusive flock must be held by a process. 
-So use '{me} --status -f /tmp/foo.lock' to see if the lock is held. 
+flock(2)'ed file is used to provide locking. This will not leave stale lock files around.
+Note that the existance of lock file does not mean that there is an outstanding lock;
+exclusive flock must be held by a process.
+So use '{me} --status -f /tmp/foo.lock' to see if the lock is held.
 
-The OS releases the lock upon process termination, so the lock file is released 
+The OS releases the lock upon process termination, so the lock file is released
 regardless of how the job terminated.
 
-Invocations: 
+Invocations:
 
 * {me} -c long-running-scrit arg1 arg2
   will ensure only one long-running-scrit will run at a time.
@@ -34,7 +34,7 @@ Invocations:
 
 * Use --status (-s) option to check if a command or a file is locked:
   {me} -s -f /tmp/foo.lock
-  {me} -s -c long-running-scrit 
+  {me} -s -c long-running-scrit
 
 Example: $ {me} -c sleep 3 & for x in {{0..6}}; do {me} -s -c sleep; sleep 1; done
   [1] 32567
@@ -83,7 +83,7 @@ class Lock(object):
     def lock_pid(self):
         """ Returns <locked,pid> pair.
             If locked is true, I got the lock.
-            Else, someone else is holding the lock, 
+            Else, someone else is holding the lock,
             in which case, pid is the owners pid or -1 for error.
         """
 
@@ -112,7 +112,7 @@ class Lock(object):
             raise
 
     def unlock(self):
-        """ undo the lock. 
+        """ undo the lock.
             this can be omitted since the OS will release the lock upon process termination.
         """
         flock(self.lock_fh, LOCK_UN)
@@ -120,7 +120,7 @@ class Lock(object):
 
 def default_lock_file(cmd):
     """ generate a name that maps to the 'same invocation' that should be excluded.
-    there is not way to be sure, so optimize this convenience feature for the 
+    there is not way to be sure, so optimize this convenience feature for the
     most common case. envisioned usage case is a custom script that does some job processing.
     Thus the resolved command executable (without regards to the args) should be used for the name space.
     """
@@ -159,12 +159,12 @@ def wrap(lock_file, cmd_tokens):
 def main():
     """ parse opts and perform the requested operation.
     """
-    # 
-    # To keep optparse from being confused by the args to the wrapped command, 
-    # the argv is split (into args_for_me and cmd_tokens) before being pased to optparse. 
+    #
+    # To keep optparse from being confused by the args to the wrapped command,
+    # the argv is split (into args_for_me and cmd_tokens) before being pased to optparse.
     # Anything up to and including the first occurance of -c belongs to me (single).
     # The rest becomes the command line to be run.
-    # 
+    #
     args=sys.argv[1:]
     from itertools import takewhile
     args_for_me=list(takewhile(lambda x: x!='-c', args))
@@ -178,8 +178,8 @@ def main():
                       action="store_true", # xx just want to make it not ask for value..
                       dest="help",
                       help="help")
-    parser.add_option("-f", 
-                      "--lock-file", 
+    parser.add_option("-f",
+                      "--lock-file",
                       dest="lock_file",
                       help="Path to the lock file. Default is provided based on the command path if omitted.")
     parser.add_option("-s",
@@ -188,22 +188,31 @@ def main():
                       dest="status",
                       help="Check to see if the file is locked, and if so, by which process. "
                       +"Exit status is 0 if unlocked, 1 if locked.")
+    parser.add_option("-S",
+                      "--silent",
+                      action="store_true",
+                      dest="silent",
+                      help="enforces a silent *fail*, works only without -s on")
 
     (opt, xargs) = parser.parse_args(args_for_me)
 
     if opt.help:
         print doc
         sys.exit(0)
-    
+
     if not cmd_tokens:
         print doc
         sys.exit(1)
-    
+
     try:
         lock_file=opt.lock_file or default_lock_file(cmd_tokens[0])
     except CommandNotFound, e:  # concise message for unresolved command
         print >>sys.stderr, ' '.join(e.args)
-        sys.exit(1)
+
+        if not opt.silent:
+            sys.exit(1)
+        else:
+            sys.exit(0)
 
     if opt.status:
         status=do_status(lock_file)
